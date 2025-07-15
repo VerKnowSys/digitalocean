@@ -1,6 +1,6 @@
 [package]
 name = "digitalocean-api"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["hoverbear <andrew@hoverbear.org>", "LoganDark <logandark@logandark.net>", "Daniel (dmilith) Dettlaff <dmilith@me.com>"]
 repository = "https://github.com/VerKnowSys/digitalocean.git"
 categories = ["development-tools", "api-bindings"]
