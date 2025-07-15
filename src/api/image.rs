@@ -6,6 +6,7 @@ use crate::request::Request;
 use crate::{ROOT_URL, STATIC_URL_ERROR};
 use chrono::{DateTime, Utc};
 use getset::{Getters, Setters};
+use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Display;
 use url::Url;
@@ -23,188 +24,187 @@ const IMAGES_SEGMENT: &str = "images";
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, Setters)]
 #[get = "pub"]
 pub struct Image {
-	/// A unique number that can be used to identify and reference a specific
-	/// image.
-	id: usize,
+    /// A unique number that can be used to identify and reference a specific
+    /// image.
+    id: usize,
 
-	/// The display name that has been given to an image. This is what is shown
-	/// in the control panel and is generally a descriptive title for the image
-	/// in question.
-	name: String,
+    /// The display name that has been given to an image. This is what is shown
+    /// in the control panel and is generally a descriptive title for the image
+    /// in question.
+    name: String,
 
-	/// The kind of image, describing the duration of how long the image is
-	/// stored. This is either "snapshot" or "backup".
-	///
-	/// *Note:* Since `type` is a keyword in Rust `kind` is used instead.
-	#[serde(rename = "type")]
-	kind: String,
-	// 'type' is reserved in Rust.
+    /// The kind of image, describing the duration of how long the image is
+    /// stored. This is either "snapshot" or "backup".
+    ///
+    /// *Note:* Since `type` is a keyword in Rust `kind` is used instead.
+    #[serde(rename = "type")]
+    kind: String,
+    // 'type' is reserved in Rust.
+    /// This attribute describes the base distribution used for this image.
+    distribution: String,
 
-	/// This attribute describes the base distribution used for this image.
-	distribution: String,
+    /// A uniquely identifying string that is associated with each of the
+    /// DigitalOcean-provided public images. These can be used to reference
+    /// a public image as an alternative to the numeric id.
+    slug: Option<String>,
 
-	/// A uniquely identifying string that is associated with each of the
-	/// DigitalOcean-provided public images. These can be used to reference
-	/// a public image as an alternative to the numeric id.
-	slug: Option<String>,
+    /// This is a boolean value that indicates whether the image in question
+    /// is public or not. An image that is public is available to all accounts.
+    /// A non-public image is only accessible from your account.
+    public: bool,
 
-	/// This is a boolean value that indicates whether the image in question
-	/// is public or not. An image that is public is available to all accounts.
-	/// A non-public image is only accessible from your account.
-	public: bool,
+    /// This attribute is an array of the regions that the image is available
+    /// in. The regions are represented by their identifying slug values.
+    regions: Vec<String>,
 
-	/// This attribute is an array of the regions that the image is available
-	/// in. The regions are represented by their identifying slug values.
-	regions: Vec<String>,
+    /// The minimum 'disk' required for a size to use this image.
+    min_disk_size: usize,
 
-	/// The minimum 'disk' required for a size to use this image.
-	min_disk_size: usize,
+    /// The size of the image in gigabytes.
+    size_gigabytes: Option<f32>,
 
-	/// The size of the image in gigabytes.
-	size_gigabytes: Option<f32>,
-
-	/// A time value given in ISO8601 combined date and time format that
-	/// represents when the Image was created.
-	created_at: DateTime<Utc>
+    /// A time value given in ISO8601 combined date and time format that
+    /// represents when the Image was created.
+    created_at: DateTime<Utc>,
 }
 
 impl Image {
-	/// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#list-all-images)
-	pub fn list() -> ImageRequest<List, Vec<Image>> {
-		let mut url = ROOT_URL.clone();
-		url.path_segments_mut()
-			.expect(STATIC_URL_ERROR)
-			.push(IMAGES_SEGMENT);
+    /// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#list-all-images)
+    pub fn list() -> ImageRequest<List, Vec<Image>> {
+        let mut url = ROOT_URL.clone();
+        url.path_segments_mut()
+            .expect(STATIC_URL_ERROR)
+            .push(IMAGES_SEGMENT);
 
-		Request::new(url)
-	}
+        Request::new(url)
+    }
 
-	/// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#list-all-distribution-images)
-	pub fn distributions() -> ImageRequest<List, Vec<Image>> {
-		let mut url = ROOT_URL.clone();
-		url.path_segments_mut()
-			.expect(STATIC_URL_ERROR)
-			.push(IMAGES_SEGMENT);
+    /// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#list-all-distribution-images)
+    pub fn distributions() -> ImageRequest<List, Vec<Image>> {
+        let mut url = ROOT_URL.clone();
+        url.path_segments_mut()
+            .expect(STATIC_URL_ERROR)
+            .push(IMAGES_SEGMENT);
 
-		url.query_pairs_mut().append_pair("type", "distribution");
+        url.query_pairs_mut().append_pair("type", "distribution");
 
-		Request::new(url)
-	}
+        Request::new(url)
+    }
 
-	/// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#list-all-application-images)
-	pub fn applications() -> ImageRequest<List, Vec<Image>> {
-		let mut url = ROOT_URL.clone();
-		url.path_segments_mut()
-			.expect(STATIC_URL_ERROR)
-			.push(IMAGES_SEGMENT);
+    /// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#list-all-application-images)
+    pub fn applications() -> ImageRequest<List, Vec<Image>> {
+        let mut url = ROOT_URL.clone();
+        url.path_segments_mut()
+            .expect(STATIC_URL_ERROR)
+            .push(IMAGES_SEGMENT);
 
-		url.query_pairs_mut().append_pair("type", "application");
+        url.query_pairs_mut().append_pair("type", "application");
 
-		Request::new(url)
-	}
+        Request::new(url)
+    }
 
-	/// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#list-a-user-s-images)
-	pub fn user() -> ImageRequest<List, Vec<Image>> {
-		let mut url = ROOT_URL.clone();
-		url.path_segments_mut()
-			.expect(STATIC_URL_ERROR)
-			.push(IMAGES_SEGMENT);
+    /// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#list-a-user-s-images)
+    pub fn user() -> ImageRequest<List, Vec<Image>> {
+        let mut url = ROOT_URL.clone();
+        url.path_segments_mut()
+            .expect(STATIC_URL_ERROR)
+            .push(IMAGES_SEGMENT);
 
-		url.query_pairs_mut().append_pair("private", "true");
+        url.query_pairs_mut().append_pair("private", "true");
 
-		Request::new(url)
-	}
+        Request::new(url)
+    }
 
-	/// `id` is either an `id` (numeric) or a `slug` (string).
-	///
-	/// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#retrieve-an-existing-image-by-id)
-	pub fn get<S: Display>(id: S) -> ImageRequest<Get, Image> {
-		let mut url = ROOT_URL.clone();
-		url.path_segments_mut()
-			.expect(STATIC_URL_ERROR)
-			.push(IMAGES_SEGMENT)
-			.push(&format!("{}", id));
+    /// `id` is either an `id` (numeric) or a `slug` (string).
+    ///
+    /// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#retrieve-an-existing-image-by-id)
+    pub fn get<S: Display>(id: S) -> ImageRequest<Get, Image> {
+        let mut url = ROOT_URL.clone();
+        url.path_segments_mut()
+            .expect(STATIC_URL_ERROR)
+            .push(IMAGES_SEGMENT)
+            .push(&format!("{id}"));
 
-		Request::new(url)
-	}
+        Request::new(url)
+    }
 
-	/// `id` is either an `id` (numeric) or a `slug` (string).
-	///
-	/// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#update-an-image)
-	pub fn update<S: Display>(id: S) -> ImageRequest<Update, Image> {
-		let mut url = ROOT_URL.clone();
-		url.path_segments_mut()
-			.expect(STATIC_URL_ERROR)
-			.push(IMAGES_SEGMENT)
-			.push(&format!("{}", id));
+    /// `id` is either an `id` (numeric) or a `slug` (string).
+    ///
+    /// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#update-an-image)
+    pub fn update<S: Display>(id: S) -> ImageRequest<Update, Image> {
+        let mut url = ROOT_URL.clone();
+        url.path_segments_mut()
+            .expect(STATIC_URL_ERROR)
+            .push(IMAGES_SEGMENT)
+            .push(&format!("{id}"));
 
-		Request::new(url)
-	}
+        Request::new(url)
+    }
 
-	/// `id` is either an `id` (numeric) or a `slug` (string).
-	///
-	/// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#delete-an-image)
-	pub fn delete<S: Display>(id: S) -> ImageRequest<Delete, ()> {
-		let mut url = ROOT_URL.clone();
-		url.path_segments_mut()
-			.expect(STATIC_URL_ERROR)
-			.push(IMAGES_SEGMENT)
-			.push(&format!("{}", id));
+    /// `id` is either an `id` (numeric) or a `slug` (string).
+    ///
+    /// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#delete-an-image)
+    pub fn delete<S: Display>(id: S) -> ImageRequest<Delete, ()> {
+        let mut url = ROOT_URL.clone();
+        url.path_segments_mut()
+            .expect(STATIC_URL_ERROR)
+            .push(IMAGES_SEGMENT)
+            .push(&format!("{id}"));
 
-		Request::new(url)
-	}
+        Request::new(url)
+    }
 }
 
 impl ImageRequest<Update, Image> {
-	/// The new name that you would like to use for the image.
-	///
-	/// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#images)
-	pub fn name<S: Display + Serialize>(mut self, val: S) -> ImageRequest<Update, Image> {
-		self.body_mut()["name"] = json!(val);
-		self
-	}
+    /// The new name that you would like to use for the image.
+    ///
+    /// [Digital Ocean Documentation.](https://developers.digitalocean.com/documentation/v2/#images)
+    pub fn name<S: Display + Serialize>(mut self, val: S) -> ImageRequest<Update, Image> {
+        self.body_mut()["name"] = json!(val);
+        self
+    }
 }
 
 /// Response type returned from Digital Ocean.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ImageResponse {
-	image: Image
+    image: Image,
 }
 
 impl HasResponse for Image {
-	type Response = ImageResponse;
+    type Response = ImageResponse;
 }
 
 impl HasValue for ImageResponse {
-	type Value = Image;
+    type Value = Image;
 
-	fn value(self) -> Image {
-		self.image
-	}
+    fn value(self) -> Image {
+        self.image
+    }
 }
 
 /// Response type returned from Digital Ocean.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ImageListResponse {
-	images: Vec<Image>,
-	links: ApiLinks,
-	meta: ApiMeta
+    images: Vec<Image>,
+    links: ApiLinks,
+    meta: ApiMeta,
 }
 
 impl HasResponse for Vec<Image> {
-	type Response = ImageListResponse;
+    type Response = ImageListResponse;
 }
 
 impl HasPagination for ImageListResponse {
-	fn next_page(&self) -> Option<Url> {
-		self.links.next()
-	}
+    fn next_page(&self) -> Option<Url> {
+        self.links.next()
+    }
 }
 
 impl HasValue for ImageListResponse {
-	type Value = Vec<Image>;
+    type Value = Vec<Image>;
 
-	fn value(self) -> Vec<Image> {
-		self.images
-	}
+    fn value(self) -> Vec<Image> {
+        self.images
+    }
 }

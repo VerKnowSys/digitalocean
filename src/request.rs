@@ -3,14 +3,37 @@
 //!
 
 use crate::api::{HasPagination, HasResponse};
+use crate::error::Error;
 use crate::method::{Create, Delete, Get, List, Method, Update};
 use crate::DigitalOcean;
-use crate::error::Error;
+use async_trait::async_trait;
 use getset::{Getters, MutGetters, Setters};
+use serde::Deserialize;
 use serde_json::Value;
 use std::marker::PhantomData;
 use url::Url;
-use url_serde;
+
+mod url_serde {
+    #![allow(unused)]
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use url::Url;
+
+    pub fn serialize<S>(url: &Url, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        url.to_string().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Url, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let url_str: String = String::deserialize(deserializer)?;
+        Url::parse(&url_str).map_err(serde::de::Error::custom)
+    }
+}
 
 /// A type alias with [`Request<_, Account>`](struct.Request.html) specific functions.
 pub type AccountRequest<M, V> = Request<M, V>;
@@ -57,92 +80,100 @@ pub type VolumeRequest<M, V> = Request<M, V>;
 ///
 /// In general consumers of the crate should not need to use this type directly.
 /// Instead, build up requests from what is found in [`api::*`](../api/index.html).
-#[derive(Debug, Clone, Serialize, Deserialize, MutGetters, Getters, Setters)]
+#[derive(Debug, Clone, Deserialize, MutGetters, Getters, Setters)]
 pub struct Request<A: Method, R> {
-	#[get_mut = "pub"]
-	#[set = "pub"]
-	#[get = "pub"]
-	#[serde(with = "url_serde")]
-	url: Url,
+    #[get_mut = "pub"]
+    #[set = "pub"]
+    #[get = "pub"]
+    #[serde(with = "url_serde")]
+    url: Url,
 
-	/// The JSON body of the request.
-	#[get_mut = "pub"]
-	#[set = "pub"]
-	#[get = "pub"]
-	body: Value,
+    /// The JSON body of the request.
+    #[get_mut = "pub"]
+    #[set = "pub"]
+    #[get = "pub"]
+    body: Value,
 
-	#[get = "pub"]
-	method: A,
+    #[get = "pub"]
+    method: A,
 
-	value: PhantomData<R>
+    value: PhantomData<R>,
 }
 
 impl<A: Method, V> Request<A, V> {
-	/// Create a request pointing at the given url. `V` is the value ultimately
-	/// returned when the call is executed.
-	pub fn new(url: Url) -> Self {
-		Request {
-			url,
-			body: Value::Null,
-			method: A::default(),
-			value: PhantomData,
-		}
-	}
+    /// Create a request pointing at the given url. `V` is the value ultimately
+    /// returned when the call is executed.
+    pub fn new(url: Url) -> Self {
+        Request {
+            url,
+            body: Value::Null,
+            method: A::default(),
+            value: PhantomData,
+        }
+    }
 
-	pub(crate) fn transmute<C: Method, D>(self) -> Request<C, D> {
-		let mut req = Request::new(self.url);
-		req.set_body(self.body);
-		req
-	}
+    pub(crate) fn transmute<C: Method, D>(self) -> Request<C, D> {
+        let mut req = Request::new(self.url);
+        req.set_body(self.body);
+        req
+    }
 }
 
 impl<V> Request<List, V> {
-	/// Impose a limit on the number of values which may be retrieved from a request.
-	pub fn limit(mut self, limit: Option<usize>) -> Self {
-		self.method.0 = limit;
-		self
-	}
+    /// Impose a limit on the number of values which may be retrieved from a request.
+    pub fn limit(mut self, limit: Option<usize>) -> Self {
+        self.method.0 = limit;
+        self
+    }
 }
 
 /// Describes an API call which can be executed.
+#[async_trait]
 pub trait Executable<T: HasResponse>: Sized {
-	/// Execute the corresponding call.
-	fn execute(self, instance: &DigitalOcean) -> Result<T, Error>;
+    /// Execute the corresponding call.
+    async fn execute(self, instance: &DigitalOcean) -> Result<T, Error>;
 }
 
+#[async_trait]
 impl<V> Executable<Vec<V>> for Request<List, Vec<V>>
-	where
-		Vec<V>: HasResponse,
-		<Vec<V> as HasResponse>::Response: HasPagination {
-	fn execute(self, instance: &DigitalOcean) -> Result<Vec<V>, Error> {
-		let response: Vec<V> = instance.list(self)?;
-		Ok(response)
-	}
+where
+    Vec<V>: HasResponse,
+    <Vec<V> as HasResponse>::Response: HasPagination,
+    V: std::marker::Send,
+{
+    async fn execute(self, instance: &DigitalOcean) -> Result<Vec<V>, Error> {
+        let response: Vec<V> = instance.list(self).await?;
+        Ok(response)
+    }
 }
 
-impl<V: HasResponse> Executable<V> for Request<Create, V> {
-	fn execute(self, instance: &DigitalOcean) -> Result<V, Error> {
-		let response = instance.post(self)?;
-		Ok(response)
-	}
+#[async_trait]
+impl<V: HasResponse + std::marker::Send> Executable<V> for Request<Create, V> {
+    async fn execute(self, instance: &DigitalOcean) -> Result<V, Error> {
+        let response = instance.post(self).await?;
+        Ok(response)
+    }
 }
 
-impl<V: HasResponse> Executable<V> for Request<Update, V> {
-	fn execute(self, instance: &DigitalOcean) -> Result<V, Error> {
-		let response = instance.put(self)?;
-		Ok(response)
-	}
+#[async_trait]
+impl<V: HasResponse + std::marker::Send> Executable<V> for Request<Update, V> {
+    async fn execute(self, instance: &DigitalOcean) -> Result<V, Error> {
+        let response = instance.put(self).await?;
+        Ok(response)
+    }
 }
 
-impl<V: HasResponse> Executable<V> for Request<Get, V> {
-	fn execute(self, instance: &DigitalOcean) -> Result<V, Error> {
-		let response = instance.get(self)?;
-		Ok(response)
-	}
+#[async_trait]
+impl<V: HasResponse + std::marker::Send> Executable<V> for Request<Get, V> {
+    async fn execute(self, instance: &DigitalOcean) -> Result<V, Error> {
+        let response = instance.get(self).await?;
+        Ok(response)
+    }
 }
 
+#[async_trait]
 impl Executable<()> for Request<Delete, ()> {
-	fn execute(self, instance: &DigitalOcean) -> Result<(), Error> {
-		instance.delete(self)
-	}
+    async fn execute(self, instance: &DigitalOcean) -> Result<(), Error> {
+        instance.delete(self).await
+    }
 }
