@@ -1,5 +1,5 @@
 [package]
-name = "digitalocean"
+name = "digitalocean-api"
 version = "0.2.0"
 authors = ["hoverbear <andrew@hoverbear.org>", "LoganDark <logandark@logandark.net>", "Daniel (dmilith) Dettlaff <dmilith@me.com>"]
 repository = "https://github.com/VerKnowSys/digitalocean.git"
